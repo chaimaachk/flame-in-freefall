@@ -32,3 +32,46 @@ Flame/Smoke sensors            engine evaluation                dashboard, alert
 - **Least trust in a single input**: no single sensor reading can trigger CRITICAL-level automatic action alone.
 - **Local autonomy**: edge controller can make the CRITICAL call without waiting on SCADA/ground link latency.
 - **Human override always available**, but never required to stop a runaway automatic response fast enough to matter.
+
+
+---
+
+## Visual Architecture Diagram
+
+
+graph TD
+    subgraph Layer1 [1. Field Layer - Sensors]
+        S1[Temp / Heat Flux]
+        S2[O2 / CO2 Telemetry]
+        S3[Flame / Smoke Sensors]
+    end
+
+    subgraph Layer2 [2. Edge/Control Layer - PLC]
+        FE[Feature Extraction]
+        ML[ML Risk Prediction]
+        RE[risk_engine.py Evaluation]
+        VOT{2-of-3 Sensor Voting}
+        
+        S1 & S2 & S3 --> FE --> ML --> RE --> VOT
+    end
+
+    subgraph Layer3 [3. Supervisory Layer - SCADA/HMI]
+        DASH[Crew Dashboard & Alerts]
+        OVER[Manual Override Controls]
+        LOG[Immutable Audit Logging]
+    end
+
+    subgraph Layer4 [4. Actuation Layer]
+        A1[Nominal / Log Event]
+        A2[Watch / Increase Polling Rate]
+        A3[Warning / Alert Crew & Arm Actuators]
+        A4[CRITICAL / Auto Compartment Seal & Suppression]
+    end
+
+    VOT -- Telemetry State --> DASH & LOG
+    OVER -. Override Command .-> Layer4
+    
+    VOT -- Score < 0.30 --> A1
+    VOT -- 0.30 <= Score < 0.60 --> A2
+    VOT -- 0.60 <= Score < 0.85 --> A3
+    VOT -- Score >= 0.85 + Consensus --> A4
